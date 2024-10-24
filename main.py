@@ -3,6 +3,8 @@ import cv2
 import face_recognition
 import os
 import pickle
+import uuid
+import tkinter.messagebox
 
 from pathlib import Path
 
@@ -20,8 +22,10 @@ def load_faces():
             continue
         for data in os.listdir(face_dir):
             if data.endswith(".dat"):
+                if face not in known_faces:
+                    known_faces[face] = []
                 dat_file = open(face_dir+"/"+data, 'rb')
-                known_faces[face] = pickle.load(dat_file)
+                known_faces[face].append(pickle.load(dat_file))
                 dat_file.close()
     
     return known_faces
@@ -34,10 +38,15 @@ def make_face_preview(face_loc, frame):
     return img
 
 def save_face(face_enc, name, img):
+    count = 0 # how much face datas we have
     dir = FACES_DIR+name
-    file = dir+"/"+name+".dat"
+    file = dir+"/"+uuid.uuid4().hex+"_"+str(count)+".dat"
     imgfile = dir+"/"+name+".png"
-    #os.mkdir(dir, exist_ok=True)
+    
+    while(os.path.isfile(file)):
+        count += 1
+        file = dir+"/"+name+count+".dat"
+        
     Path(dir).mkdir(exist_ok=True)
     dat_file = open(file, 'wb')
     pickle.dump(face_enc, dat_file)
@@ -66,32 +75,42 @@ def main():
         frame = cv2.resize(frame, (0,0), fx=SCALE_KOEFF, fy=SCALE_KOEFF)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # Find all the faces in the current frame of video    
+        # Find all faces in the current frame of video    
         face_locations = face_recognition.face_locations(rgb_frame, model="hog")
         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
         
+        # container for faces names (we have faces encodings and names loaded in the same order)
         face_names = []
         
+        # lets find faces on the frame
         for face in zip(face_locations,face_encodings):
-            face_loc = face[0]
-            face_enc = face[1]
-            match = face_recognition.compare_faces(list(known_faces.values()), face_enc, tolerance=0.5)
-            name = "UNKNOWN" + str(len(known_faces)+1)
+            face_loc = face[0] # all faces locations
+            face_enc = face[1] # all located faces encodings
             
-            iter = 0
+            faceInd = 0 # index for name
             found = False
-            while iter < len(match):
-                if match[iter]:
-                    name = list(known_faces.keys())[iter]
-                    face_names.append(name)
-                    found = True
-                    break
-                iter+=1
+            
+            # lets go through encodinds for current face
+            for face_enc_data in known_faces.values():
+                match = face_recognition.compare_faces(list(face_enc_data), face_enc) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)
+                name = "UNKNOWN" + str(len(known_faces)+1) # default name
+                
+                encIndex = 0 # index for encoding
+                while encIndex < len(match):
+                    if match[encIndex]:
+                        name = list(known_faces.keys())[faceInd]
+                        face_names.append(name)
+                        found = True
+                        break
+                    encIndex += 1
+                # didnt found -> lets check the next face and its encodings
+                faceInd += 1
+                    
             if found:
                 continue
             
             save_face(face_enc, name, make_face_preview(face_loc, frame))
-            known_faces[name] = face_enc
+            known_faces[name] = [face_enc]
             
         # Display the results
         for (top, right, bottom, left), name in zip(face_locations,face_names):
@@ -103,11 +122,13 @@ def main():
         cv2.imshow('Video', frame)
         
         # Hit 'q' on the keyboard to quit!
-        if cv2.waitKey(1) & 0xFF == ord('q'):    
+        pressed_key = cv2.waitKey(1) & 0xFF
+        if pressed_key == ord('q'):
             break
         # hit 'r' to reload faces (when rename etc)
-        if cv2.waitKey(1) & 0xFF == ord('r'):
+        if pressed_key == ord('r'):
             known_faces = load_faces()
+            tkinter.messagebox.showinfo('Info','Reloaded faces')
     
     # Release handle to the webcam
     video_capture.release()
