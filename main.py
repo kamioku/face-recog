@@ -11,16 +11,6 @@ SCALE_KOEFF = 0.5
 FACES_DIR = "faces/"
 FACE_BORDER_PADDING = 0.05
 
-# def load_faces():
-#     known_faces = {}
-#     # initialize known mordas
-#     for img in os.listdir(FACES_DIR):
-#         name = img.rstrip(".png")
-#         image = face_recognition.load_image_file(FACES_DIR + img)
-#         for face_encoding in face_recognition.face_encodings(image):
-#             known_faces[name] = face_encoding
-            
-#     return known_faces
 def load_faces():
     known_faces = {}
     # initialize known mordas
@@ -68,20 +58,15 @@ def main():
     while True:
         
         # Grab a single frame of video
-            
         ret, frame = video_capture.read()
-        
         if not ret:
             continue
             
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-            
         frame = cv2.resize(frame, (0,0), fx=SCALE_KOEFF, fy=SCALE_KOEFF)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-            
-        # Find all the faces in the current frame of video
-            
+        # Find all the faces in the current frame of video    
         face_locations = face_recognition.face_locations(rgb_frame, model="hog")
         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
         
@@ -105,32 +90,22 @@ def main():
             if found:
                 continue
             
-            # top, right, bottom, left = face_loc
-            # cv2.imwrite(FACES_DIR+name+".png", frame[int(top*(1-FACE_BORDER_PADDING)):int(bottom*(1+FACE_BORDER_PADDING)), int(left*(1-FACE_BORDER_PADDING)):int(right*(1+FACE_BORDER_PADDING))])
-            # known_faces[name] = face_enc
-            # face_names.append(name)
             save_face(face_enc, name, make_face_preview(face_loc, frame))
             known_faces[name] = face_enc
             
         # Display the results
-            
         for (top, right, bottom, left), name in zip(face_locations,face_names):
-                    
             # Draw a box around the face
-                    
             cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
             cv2.putText(frame, name, (left+5, bottom-5), fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0,0,255))
             
-            
         # Display the resulting image
-            
         cv2.imshow('Video', frame)
         
-            
         # Hit 'q' on the keyboard to quit!
-            
         if cv2.waitKey(1) & 0xFF == ord('q'):    
             break
+        # hit 'r' to reload faces (when rename etc)
         if cv2.waitKey(1) & 0xFF == ord('r'):
             known_faces = load_faces()
     
