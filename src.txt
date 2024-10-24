@@ -1,0 +1,5 @@
+jetson  https://habr.com/ru/companies/skillfactory/articles/544430/
+indus   https://habr.com/ru/companies/netologyru/articles/434354/
+pi      https://codeby.net/threads/kak-sobrat-prostuju-sistemu-raspoznavanija-lic-v-rezhime-realnogo-vremeni.67944/
+
+github  https://github.com/reddytocode/FaceDetectionWebCamDemo/tree/master
