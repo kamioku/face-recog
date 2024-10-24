@@ -40,8 +40,9 @@ def make_face_preview(face_loc, frame):
 def save_face(face_enc, name, img):
     count = 0 # how much face datas we have
     dir = FACES_DIR+name
-    file = dir+"/"+uuid.uuid4().hex+"_"+str(count)+".dat"
-    imgfile = dir+"/"+name+".png"
+    id = uuid.uuid4().hex
+    file = dir+"/"+id+"_"+str(count)+".dat"
+    imgfile = dir+"/"+id+".png"
     
     while(os.path.isfile(file)):
         count += 1
