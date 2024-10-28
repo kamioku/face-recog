@@ -15,6 +15,8 @@ FACE_BORDER_PADDING = 0.05
 
 def load_faces():
     known_faces = {}
+    if not os.path.isdir(FACES_DIR):
+        os.mkdir(FACES_DIR)
     # initialize known mordas
     for face in os.listdir(FACES_DIR):
         face_dir = FACES_DIR+face
@@ -91,11 +93,11 @@ def main():
             faceInd = 0 # index for name
             found = False
             
+            name = "UNKNOWN" + str(len(known_faces)+1) # default name
+
             # lets go through encodinds for current face
             for face_enc_data in known_faces.values():
-                match = face_recognition.compare_faces(list(face_enc_data), face_enc) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)
-                name = "UNKNOWN" + str(len(known_faces)+1) # default name
-                
+                match = face_recognition.compare_faces(list(face_enc_data), face_enc) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
                 encIndex = 0 # index for encoding
                 while encIndex < len(match):
                     if match[encIndex]:
