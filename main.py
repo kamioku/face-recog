@@ -10,6 +10,8 @@ from pathlib import Path
 
 SCALE_KOEFF = 0.5
 
+FACES_ENCODS = 5
+
 FACES_DIR = "faces/"
 FACE_BORDER_PADDING = 0.05
 
@@ -40,15 +42,17 @@ def make_face_preview(face_loc, frame):
     return img
 
 def save_face(face_enc, name, img):
-    count = 0 # how much face datas we have
+    #count = 0 # how much face datas we have
     dir = FACES_DIR+name
     id = uuid.uuid4().hex
-    file = dir+"/"+id+"_"+str(count)+".dat"
+    file = dir+"/"+id+".dat"
     imgfile = dir+"/"+id+".png"
     
+    # if for some reason we have same id in that folder
     while(os.path.isfile(file)):
-        count += 1
-        file = dir+"/"+name+count+".dat"
+        id = uuid.uuid4().hex
+        file = dir+"/"+id+".dat"
+        imgfile = dir+"/"+id+".png"
         
     Path(dir).mkdir(exist_ok=True)
     dat_file = open(file, 'wb')
@@ -97,7 +101,7 @@ def main():
 
             # lets go through encodinds for current face
             for face_enc_data in known_faces.values():
-                match = face_recognition.compare_faces(list(face_enc_data), face_enc) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
+                match = face_recognition.compare_faces(list(face_enc_data), face_enc, tolerance=0.5) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
                 encIndex = 0 # index for encoding
                 while encIndex < len(match):
                     if match[encIndex]:
@@ -110,6 +114,9 @@ def main():
                 faceInd += 1
                     
             if found:
+                if len(known_faces[name]) < FACES_ENCODS:
+                    save_face(face_enc, name, make_face_preview(face_loc, frame))        
+                    known_faces[name].append(face_enc)
                 continue
             
             save_face(face_enc, name, make_face_preview(face_loc, frame))

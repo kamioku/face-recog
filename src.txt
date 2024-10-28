@@ -6,3 +6,4 @@ github  https://github.com/reddytocode/FaceDetectionWebCamDemo/tree/master
 
 hog     https://habr.com/ru/articles/306568/
 few enc https://stackoverflow.com/questions/60009291/python-face-recognition-dataset-quality
+another https://habr.com/ru/companies/droider/articles/568764/
