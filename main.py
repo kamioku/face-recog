@@ -60,6 +60,25 @@ def save_face(face_enc, name, img):
     cv2.imwrite(imgfile, img)
     
     dat_file.close()
+    
+def recognize_face(face_enc, known_faces, default_name, face_names):
+    faceInd = 0 # index for name
+    found = False
+    # lets go through encodinds for current face
+    for face_enc_data in known_faces.values():
+        match = face_recognition.compare_faces(list(face_enc_data), face_enc, tolerance=0.6) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
+        encIndex = 0 # index for encoding
+        while encIndex < len(match):
+            if match[encIndex]:
+                default_name = list(known_faces.keys())[faceInd]
+                face_names.append(default_name)
+                found = True
+                break
+            encIndex += 1
+        # didnt found -> lets check the next face and its encodings
+        faceInd += 1
+        
+    return found, default_name
 
 def main():
     # load known faces
@@ -72,7 +91,6 @@ def main():
     face_locations = []
     
     while True:
-        
         # Grab a single frame of video
         ret, frame = video_capture.read()
         if not ret:
@@ -94,25 +112,9 @@ def main():
             face_loc = face[0] # all faces locations
             face_enc = face[1] # all located faces encodings
             
-            faceInd = 0 # index for name
-            found = False
-            
             name = "UNKNOWN" + str(len(known_faces)+1) # default name
-
-            # lets go through encodinds for current face
-            for face_enc_data in known_faces.values():
-                match = face_recognition.compare_faces(list(face_enc_data), face_enc, tolerance=0.5) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
-                encIndex = 0 # index for encoding
-                while encIndex < len(match):
-                    if match[encIndex]:
-                        name = list(known_faces.keys())[faceInd]
-                        face_names.append(name)
-                        found = True
-                        break
-                    encIndex += 1
-                # didnt found -> lets check the next face and its encodings
-                faceInd += 1
-                    
+            found, name = recognize_face(face_enc, known_faces, name, face_names) # recognize any faces in frame
+            
             if found:
                 if len(known_faces[name]) < FACES_ENCODS:
                     save_face(face_enc, name, make_face_preview(face_loc, frame))        
@@ -126,7 +128,7 @@ def main():
         for (top, right, bottom, left), name in zip(face_locations,face_names):
             # Draw a box around the face
             cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-            cv2.putText(frame, name, (left+5, bottom-5), fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0,0,255))
+            cv2.putText(frame, name, (left+5, bottom-5), fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.4, color=(0,0,255))
             
         # Display the resulting image
         cv2.imshow('Video', frame)
