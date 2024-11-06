@@ -8,6 +8,8 @@ import tkinter.messagebox
 
 from pathlib import Path
 
+from modules.face_data import FaceData
+
 SCALE_KOEFF = 0.5
 
 FACES_ENCODS = 5
@@ -15,7 +17,7 @@ FACES_ENCODS = 5
 FACES_DIR = "faces/"
 FACE_BORDER_PADDING = 0.05
 
-def load_faces():
+def load_faces() -> dict[str, list[FaceData]]:
     known_faces = {}
     if not os.path.isdir(FACES_DIR):
         os.mkdir(FACES_DIR)
@@ -29,20 +31,18 @@ def load_faces():
                 if face not in known_faces:
                     known_faces[face] = []
                 dat_file = open(face_dir+"/"+data, 'rb')
-                known_faces[face].append(pickle.load(dat_file))
+                known_faces[face].append(FaceData(pickle.load(dat_file), data))
                 dat_file.close()
     
     return known_faces
 
-def make_face_preview(face_loc, frame):
+def make_face_preview(face_loc, frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
     # make preview
     top, right, bottom, left = face_loc
     img = frame[int(top*(1-FACE_BORDER_PADDING)):int(bottom*(1+FACE_BORDER_PADDING)), int(left*(1-FACE_BORDER_PADDING)):int(right*(1+FACE_BORDER_PADDING))]
     #cv2.imwrite(FACES_DIR+name+".png", img)
     return img
-
-def save_face(face_enc, name, img):
-    #count = 0 # how much face datas we have
+def save_face(face_enc, name, img) -> FaceData: #count = 0 # how much face datas we have
     dir = FACES_DIR+name
     id = uuid.uuid4().hex
     file = dir+"/"+id+".dat"
@@ -60,13 +60,42 @@ def save_face(face_enc, name, img):
     cv2.imwrite(imgfile, img)
     
     dat_file.close()
+    return FaceData(face_enc, id)
+
+def remove_encoding(known_faces: dict[str, list[FaceData]], name, data:FaceData) -> None:
+    known_faces[name].remove(data)
+
+    file = FACES_DIR+name+'/'+data.get_filename()
+    os.remove(file)
+
+def get_face_encods_list(known_faces: dict[str, list[FaceData]], name) -> list[FaceData]:
+    enc_list = []
+    for data in known_faces[name]:
+        enc_list.append(data.get_enc())
+
+    return enc_list
+
+def remove_similar_encods(known_faces, name, max_dist) -> None:
+    dists = []
+
+    for face in get_face_encods_list(known_faces, name):
+        dists = face_recognition.face_distance(known_faces[name][1:], face)
+
+    idxDist = 0
+    while idxDist < len(dists):
+        if dists[idxDist] < max_dist:
+            remove_encoding(known_faces, name, dists[idxDist])
+
     
-def recognize_face(face_enc, known_faces, default_name, face_names):
+def recognize_face(face_enc, known_faces: dict[str, list[FaceData]], default_name, face_names) -> tuple[bool, str]:
     faceInd = 0 # index for name
     found = False
     # lets go through encodinds for current face
     for face_enc_data in known_faces.values():
-        match = face_recognition.compare_faces(list(face_enc_data), face_enc, tolerance=0.6) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
+        face_enc_list = []
+        for facedata in face_enc_data:
+            face_enc_list.append(facedata.get_enc())
+        match = face_recognition.compare_faces(face_enc_list, face_enc, tolerance=0.6) # find how current face matches our faces from the storage (euqlid distance from current face metrics to storage faces metrics)    
         encIndex = 0 # index for encoding
         while encIndex < len(match):
             if match[encIndex]:
@@ -80,7 +109,7 @@ def recognize_face(face_enc, known_faces, default_name, face_names):
         
     return found, default_name
 
-def main():
+def main() -> None:
     # load known faces
     known_faces = load_faces()
     
@@ -97,7 +126,7 @@ def main():
             continue
             
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        frame = cv2.resize(frame, (0,0), fx=SCALE_KOEFF, fy=SCALE_KOEFF)
+        frame: cv2.typing.MatLike = cv2.resize(frame, (0,0), fx=SCALE_KOEFF, fy=SCALE_KOEFF)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         # Find all faces in the current frame of video    
@@ -117,12 +146,12 @@ def main():
             
             if found:
                 if len(known_faces[name]) < FACES_ENCODS:
-                    save_face(face_enc, name, make_face_preview(face_loc, frame))        
-                    known_faces[name].append(face_enc)
+                    new_face = save_face(face_enc, name, make_face_preview(face_loc, frame))        
+                    known_faces[name].append(new_face)
                 continue
             
-            save_face(face_enc, name, make_face_preview(face_loc, frame))
-            known_faces[name] = [face_enc]
+            new_face = save_face(face_enc, name, make_face_preview(face_loc, frame))
+            known_faces[name] = [new_face]
             
         # Display the results
         for (top, right, bottom, left), name in zip(face_locations,face_names):
