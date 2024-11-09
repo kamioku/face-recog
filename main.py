@@ -1,4 +1,3 @@
-# import libraries
 import cv2
 from cv2.typing import MatLike
 import face_recognition
@@ -6,19 +5,24 @@ import os
 import pickle
 import uuid
 import tkinter.messagebox
+import time
+from threading import Thread
 
 from pathlib import Path
 
 from modules.face_data import FaceData
 
-SCALE_KOEFF = 0.5
+SCALE_KOEFF = 0.5   # Scale of video input
 
-FACES_ENCODS = 5
+FACES_ENCODS = 5    # How much encods save and use
+SIMILAR_FACES_DIST = 0.2    # How close must be characteristic vectors to each other to count them as same
 
-FACES_DIR = "faces/"
-FACE_BORDER_PADDING = 0.05
+FACES_DIR = "faces/"    # Directory with faces encods
+FACE_BORDER_PADDING = 0.05  # Padding for png preview for each encoding
 
+g_Working = True    # While its true - remove similar encods
 
+# load all saved faces and return container with them
 def load_faces() -> dict[str, list[FaceData]]:
     known_faces = {}
     if not os.path.isdir(FACES_DIR):
@@ -42,6 +46,7 @@ def load_faces() -> dict[str, list[FaceData]]:
     return known_faces
 
 
+# return img with face from face location on current frame
 def make_face_preview(face_loc, frame: MatLike) -> MatLike:
     # make preview
     top, right, bottom, left = face_loc
@@ -49,10 +54,10 @@ def make_face_preview(face_loc, frame: MatLike) -> MatLike:
         int(top * (1 - FACE_BORDER_PADDING)) : int(bottom * (1 + FACE_BORDER_PADDING)),
         int(left * (1 - FACE_BORDER_PADDING)) : int(right * (1 + FACE_BORDER_PADDING)),
     ]
-    # cv2.imwrite(FACES_DIR+name+".png", img)
     return img
 
 
+# save this face encoding called by 'name' and represented by 'img'. Returns saved face data
 def save_face(
     face_enc, name, img
 ) -> FaceData:  # count = 0 # how much face datas we have
@@ -63,12 +68,6 @@ def save_face(
     imgfile = id + ".png"
     imgPath = dir + "/" + imgfile
 
-    # # if for some reason we have same id in that folder
-    # while(os.path.isfile(filePath)):
-    #     id = uuid.uuid4().hex
-    #     file = dir+"/"+id+".dat"
-    #     imgfile = dir+"/"+id+".png"
-
     Path(dir).mkdir(exist_ok=True)
     dat_file = open(filePath, "wb")
     pickle.dump(face_enc, dat_file)
@@ -78,7 +77,9 @@ def save_face(
     return FaceData(face_enc, file, imgfile)
 
 
-def remove_encoding(known_faces: dict[str, list[FaceData]], name, data: FaceData) -> None:
+# remove that face encoding from file system and virtual memory
+# NEEDS REFACTOR
+def remove_encoding(known_faces: dict[str, list[FaceData]], name: str, data: FaceData) -> None:
     known_faces[name].remove(data)
     file = FACES_DIR + name + "/" + data.get_filename()
     os.remove(file)
@@ -86,14 +87,15 @@ def remove_encoding(known_faces: dict[str, list[FaceData]], name, data: FaceData
     os.remove(file)
 
 
-def get_face_encods_list(known_faces: dict[str, list[FaceData]], name) -> list[MatLike]:
+# get all encodings for curr face and return list of it in face_recognition format
+def get_face_encods_list(known_faces: dict[str, list[FaceData]], name: str) -> list[MatLike]:
     enc_list = []
     for data in known_faces[name]:
         enc_list.append(data.get_enc())
 
     return enc_list
 
-
+# remove all similar encods for all faces that is closer than max_dist and return count of removed encods
 def remove_similar_encods(known_faces: dict[str, list[FaceData]], max_dist: float) -> int:
     total_removed = 0
     for name in known_faces:
@@ -123,6 +125,7 @@ def remove_similar_encods(known_faces: dict[str, list[FaceData]], max_dist: floa
     return total_removed
 
 
+# find that face_enc in known_faces and put its name in face_names. If doesnt found - return false,default_name
 def recognize_face(
     face_enc, known_faces: dict[str, list[FaceData]], default_name, face_names
 ) -> tuple[bool, str]:
@@ -149,10 +152,18 @@ def recognize_face(
 
     return found, default_name
 
+def thread_function_timeout(timesleep, work_condition,func, *args):
+    while work_condition:
+        func(*args)
+        time.sleep(timesleep)
+    
 
 def main() -> None:
     # load known faces
     known_faces = load_faces()
+
+    # start cleaning same encodings
+    Thread(target=thread_function_timeout, args=[5, g_Working, remove_similar_encods, known_faces, SIMILAR_FACES_DIST]).start()
 
     # Get a reference to webcam
     video_capture = cv2.VideoCapture(0)
@@ -172,6 +183,7 @@ def main() -> None:
 
         # Find all faces in the current frame of video
         face_locations = face_recognition.face_locations(rgb_frame, model="hog")
+        #face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
 
         # container for faces names (we have faces encodings and names loaded in the same order)
@@ -217,13 +229,16 @@ def main() -> None:
         # Hit 'q' on the keyboard to quit!
         pressed_key = cv2.waitKey(1) & 0xFF
         if pressed_key == ord("q"):
+            global g_Working
+            g_Working = False
             break
         # hit 'r' to reload faces (when rename etc)
         if pressed_key == ord("r"):
             known_faces = load_faces()
             tkinter.messagebox.showinfo("Info", "Reloaded faces")
         if pressed_key == ord("u"):
-            tkinter.messagebox.showinfo("Info", "Removed similar face encods: " + str(remove_similar_encods(known_faces, 0.2)))
+            th = Thread(target=(lambda faces_container: tkinter.messagebox.showinfo("Info", "Removed similar face encods: " + str(remove_similar_encods(faces_container, SIMILAR_FACES_DIST)))), args=[known_faces])
+            th.start()
 
     # Release handle to the webcam
     video_capture.release()
