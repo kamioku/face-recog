@@ -2,7 +2,8 @@ from cv2.typing import MatLike
 
 
 class FaceData:
-    def __init__(self, enc, datName: str, picName: str = ""):
+    
+    def __init__(self, enc: MatLike = [], datName: str = "", picName: str = ""):
         self.__enc = enc
         self.__file = datName
         self.__pic = picName
