@@ -187,11 +187,6 @@ def main() -> None:
         
         # Grab a single frame of video
         ret, frame = video_capture.read()
-        ret, frame = video_capture.read()
-        ret, frame = video_capture.read()
-        ret, frame = video_capture.read()
-        ret, frame = video_capture.read()
-        ret, frame = video_capture.read()
         if not ret:
             continue
 
